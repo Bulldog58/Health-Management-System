@@ -29,7 +29,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-fallback-key-for-loca
 # Render sets an environment variable called 'RENDER' automatically
 DEBUG = 'RENDER' not in os.environ
 
-ALLOWED_HOSTS = ['health-management-system-1-cspe.onrender.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['hospital-resource-management-system-k3fo.onrender.com', 'localhost', '127.0.0.1']
 
 
 # Application definition
