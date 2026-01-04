@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRMS | Hospital Load Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .progress-bar { transition: width 0.5s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg p-4 mb-8">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center">
+                <i class="fas fa-hospital-user mr-3"></i> HRMS Dashboard
+            </h1>
+            <div id="auth-status" class="text-sm bg-blue-700 px-3 py-1 rounded-full">
+                <i class="fas fa-lock mr-2"></i> Token Auth Active
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 pb-12">
+        <!-- Search & Stats Bar -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <label class="block text-sm font-semibold text-gray-600 mb-2">Search Hospitals by Location</label>
+                <div class="flex gap-2">
+                    <input type="text" id="location-search" placeholder="Enter city or address..." 
+                           class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <button onclick="fetchHospitals()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col justify-center">
+                <span class="text-blue-600 font-bold text-3xl" id="total-beds-count">0</span>
+                <span class="text-blue-800 text-sm">Total Available Beds System-wide</span>
+            </div>
+        </div>
+
+        <!-- Hospital Load Grid -->
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Real-time Hospital Load</h2>
+        <div id="hospital-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Loader -->
+            <div class="animate-pulse bg-gray-200 h-64 rounded-xl"></div>
+            <div class="animate-pulse bg-gray-200 h-64 rounded-xl"></div>
+            <div class="animate-pulse bg-gray-200 h-64 rounded-xl"></div>
+        </div>
+    </main>
+
+    <!-- Modal for Assigning (Pseudo-logic) -->
+    <div id="assign-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8">
+            <h3 class="text-xl font-bold mb-4">Final QA: Admit Patient</h3>
+            <p class="text-gray-600 mb-6">This triggers the <code>/assign/</code> endpoint with Token Authentication.</p>
+            <div class="flex gap-3">
+                <button onclick="closeModal()" class="flex-1 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button class="flex-1 py-2 bg-blue-600 text-white rounded-lg">Confirm Admission</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data representing the DRF response for demo purposes
+        const mockHospitals = [
+            { id: 1, name: "City Central Hospital", address: "123 Main St, New York", total_capacity: 100, current_occupancy: 85, specialties: ["Cardiology", "ER"] },
+            { id: 2, name: "Westside Clinic", address: "456 West Ave, New York", total_capacity: 50, current_occupancy: 10, specialties: ["Orthopedics"] },
+            { id: 3, name: "St. Jude Medical", address: "789 Pine Rd, Jersey City", total_capacity: 200, current_occupancy: 195, specialties: ["General Surgery", "Pediatrics"] }
+        ];
+
+        function getLoadColor(percent) {
+            if (percent > 90) return 'bg-red-500';
+            if (percent > 70) return 'bg-orange-500';
+            return 'bg-green-500';
+        }
+
+        function renderHospitals(hospitals) {
+            const grid = document.getElementById('hospital-grid');
+            const totalBedsEl = document.getElementById('total-beds-count');
+            let totalBeds = 0;
+            
+            grid.innerHTML = '';
+            
+            hospitals.forEach(h => {
+                const loadPercent = (h.current_occupancy / h.total_capacity) * 100;
+                const available = h.total_capacity - h.current_occupancy;
+                totalBeds += available;
+
+                const card = `
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition cursor-pointer" onclick="openModal()">
+                        <div class="p-6">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">${h.name}</h3>
+                                    <p class="text-gray-500 text-xs"><i class="fas fa-map-marker-alt mr-1"></i> ${h.address}</p>
+                                </div>
+                                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${loadPercent > 90 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
+                                    ${loadPercent > 90 ? 'Critical' : 'Stable'}
+                                </span>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-600">Capacity Load</span>
+                                    <span class="font-semibold">${Math.round(loadPercent)}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="progress-bar h-2 rounded-full ${getLoadColor(loadPercent)}" style="width: ${loadPercent}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="text-gray-500">
+                                    <i class="fas fa-bed mr-1"></i> <strong>${available}</strong> beds free
+                                </div>
+                                <div class="flex -space-x-2">
+                                    ${h.specialties.slice(0,2).map(s => `<span class="h-6 w-6 bg-blue-100 text-blue-600 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold" title="${s}">${s[0]}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+
+            totalBedsEl.innerText = totalBeds;
+        }
+
+        function openModal() { document.getElementById('assign-modal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('assign-modal').classList.add('hidden'); }
+
+        // Initial fetch simulation
+        function fetchHospitals() {
+            const search = document.getElementById('location-search').value.toLowerCase();
+            const filtered = mockHospitals.filter(h => h.address.toLowerCase().includes(search));
+            renderHospitals(filtered);
+        }
+
+        window.onload = () => setTimeout(fetchHospitals, 800);
+    </script>
+</body>
+</html>

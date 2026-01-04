@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRMS Enterprise </title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        :root { --glass: rgba(255, 255, 255, 0.9); }
+        [data-bs-theme="dark"] { --glass: rgba(33, 37, 41, 0.9); }
+
+        body { font-family: 'Inter', sans-serif; background-color: #f4f7f6; transition: background 0.3s; }
+        .navbar { background: linear-gradient(135deg, #6610f2, #0d6efd); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .stat-card { border: none; border-radius: 20px; color: white; transition: 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .bg-vibrant-purple { background: linear-gradient(135deg, #6f42c1, #a927f9); }
+        .bg-vibrant-blue { background: linear-gradient(135deg, #0d6efd, #0dcaf0); }
+        .bg-vibrant-orange { background: linear-gradient(135deg, #fd7e14, #ffc107); }
+        .table-container, .chart-container { background: var(--glass); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark sticky-top mb-4">
+    <div class="container d-flex justify-content-between">
+        <span class="navbar-brand fw-bold">🏥 HRMS </span>
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-sm btn-light rounded-pill" onclick="toggleDarkMode()">
+                <i class="bi bi-moon-stars"></i>
+            </button>
+            <span class="text-white d-none d-md-inline">Welcome, <strong>{{ user.username }}</strong></span>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4 rounded-4" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-8">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card stat-card bg-vibrant-purple p-4 h-100">
+                        <p class="mb-1 opacity-75">Hospitals</p>
+                        <h2 class="fw-bold mb-0">{{ hosp_count }}</h2>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card bg-vibrant-blue p-4 h-100">
+                        <p class="mb-1 opacity-75">Specialties</p>
+                        <h2 class="fw-bold mb-0">{{ spec_count }}</h2>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card bg-vibrant-orange p-4 h-100">
+                        <p class="mb-1 opacity-75">Global Capacity</p>
+                        <h2 class="fw-bold mb-0">{{ total_capacity }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="chart-container h-100">
+                <h6 class="fw-bold mb-3">Specialty Distribution</h6>
+                <canvas id="specialtyChart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="table-container mb-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                    <h4 class="fw-bold text-dark mb-0">Live Hospital Registry</h4>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="/admin/hospitals/hospital/add/" class="btn btn-success shadow-sm rounded-pill px-3">
+                            <i class="bi bi-plus-lg"></i> Add Hospital
+                        </a>
+                        <button class="btn btn-outline-secondary shadow-sm rounded-pill" onclick="window.print()">
+                            <i class="bi bi-download"></i>
+                        </button>
+                    </div>
+
+                    <form class="d-flex" method="GET">
+                        <input class="form-control rounded-pill border-0 shadow-sm px-3" type="search" name="search" 
+                               value="{{ request.GET.search }}" placeholder="Quick search...">
+                    </form>
+                </div>
+
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr class="text-muted small text-uppercase">
+                            <th>Hospital</th>
+                            <th>Location</th>
+                            <th>Status</th> <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hospital in hospitals %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-primary">{{ hospital.name }}</div>
+                                <div class="small text-muted">ID: #00{{ hospital.id }}</div>
+                            </td>
+                            <td>{{ hospital.address }}</td>
+                            <td>
+                                {% if hospital.total_capacity > 100 %}
+                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success">High Capacity</span>
+                                {% elif hospital.total_capacity > 50 %}
+                                    <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning">Limited</span>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger">Critical</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group shadow-sm rounded-3">
+                                    <a href="/admin/hospitals/hospital/{{ hospital.id }}/change/" class="btn btn-sm btn-light border">Edit</a>
+                                    <form action="{% url 'delete_hospital' hospital.pk %}" method="POST" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger" onclick="return confirm('Delete permanently?')">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Feature 6: Dark Mode Logic
+    function toggleDarkMode() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-bs-theme');
+        html.setAttribute('data-bs-theme', currentTheme === 'dark' ? 'light' : 'dark');
+    }
+
+    // Feature 1: Chart.js Initialization
+    const ctx = document.getElementById('specialtyChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [{
+                data: {{ chart_data|safe }},
+                backgroundColor: ['#6f42c1', '#0d6efd', '#fd7e14', '#20c997', '#ffc107'],
+                borderWidth: 0
+            }]
+        },
+        options: { plugins: { legend: { display: false } }, cutout: '70%' }
+    });
+</script>
+
+</body>
+</html>

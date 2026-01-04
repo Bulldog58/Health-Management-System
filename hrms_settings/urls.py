@@ -25,4 +25,5 @@ urlpatterns = [
     path('api/v1/', include('patients.urls')),
     # Include the CORE API URLs (NEW)
     path('api/v1/', include('core_api.urls')), 
+    path('', include('hospitals.urls')), # This makes the hospital URLs the "root"
 ]

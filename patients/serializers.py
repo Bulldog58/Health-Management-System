@@ -10,7 +10,7 @@ class IssueSpecialtyMapSerializer(serializers.ModelSerializer):
     class Meta:
         model = IssueSpecialtyMap
         fields = ['id', 'issue_term', 'primary_specialty', 'primary_specialty_name']
-
+ 
 # --- 2. Patient Serializer ---
 class PatientSerializer(serializers.ModelSerializer):
     # Use the nested HospitalSerializer to display the assigned hospital details
