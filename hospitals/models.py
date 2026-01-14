@@ -32,18 +32,17 @@ class Hospital(models.Model):
 
     @property
     def current_occupancy(self):
-        # Using 'admitted_patients' to match the related_name in the Patient model below
-        return self.admitted_patients.filter(status='IN').count()
+        # Updated to match the unique related_name below
+        return self.hospitals_patients.filter(status='IN').count()
 
 class Patient(models.Model):
     STATUS_CHOICES = [('IN', 'Inpatient'), ('OUT', 'Outpatient')]
     
     name = models.CharField(max_length=200)
-    # Match the related_name to your @property logic
     hospital = models.ForeignKey(
         Hospital, 
         on_delete=models.CASCADE, 
-        related_name='admitted_patients'
+        related_name='hospitals_patients' # Unique ID for this app
     )
     status = models.CharField(max_length=3, choices=STATUS_CHOICES, default='OUT')
     admitted_at = models.DateTimeField(auto_now_add=True)

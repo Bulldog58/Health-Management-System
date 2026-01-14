@@ -6,17 +6,20 @@ from django.contrib import messages
 from rest_framework import viewsets, status, generics
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from itertools import chain # Used to merge patient lists
 import json
 
-# Import your models
-from .models import Hospital, Specialty, Patient, Appointment 
+# Import models from BOTH apps
+from .models import Hospital, Specialty, Patient as HospPatient, Appointment 
+from patients.models import Patient as PatPatient
 from .serializers import HospitalSerializer, SpecialtySerializer
 
-# --- 1. THE DASHBOARD VIEW ---
+# --- 1. THE UNIFIED DASHBOARD VIEW ---
 def dashboard(request):
     query = request.GET.get('search')
     hospitals = Hospital.objects.all()
     
+    # Search Logic
     if query:
         hospitals = hospitals.filter(
             Q(name__icontains=query) | Q(address__icontains=query)
@@ -24,33 +27,39 @@ def dashboard(request):
 
     specialties = Specialty.objects.all()
     
-    upcoming_appointments = Appointment.objects.filter(
-        appointment_date__gte=timezone.now(),
-        status='scheduled'
-    ).order_by('appointment_date')[:5]
+    # Fetch Top 5 Patients from both models
+    h_patients = HospPatient.objects.all().order_by('-id')[:5]
+    p_patients = PatPatient.objects.all().order_by('-id')[:5]
+    # Merge them into one list for the table
+    combined_patients = list(chain(h_patients, p_patients))
 
+    # Stats Calculations
     pending_count = Appointment.objects.filter(
         status='scheduled', 
         appointment_date__gte=timezone.now()
     ).count()
+    
+    # Calculate global capacity
+    total_cap = sum(h.total_capacity for h in hospitals)
 
+    # Chart.js Data
     chart_labels = [s.name for s in specialties]
     chart_data = [Hospital.objects.filter(specialties=s).count() for s in specialties]
 
     context = {
         'hospitals': hospitals,
         'specialties': specialties,
-        'upcoming_appointments': upcoming_appointments,
+        'combined_patients': combined_patients, # Used in the table
         'pending_count': pending_count,
         'hosp_count': hospitals.count(),
         'spec_count': specialties.count(),
-        'total_capacity': sum(h.total_capacity for h in hospitals),
+        'total_capacity': total_cap,
         'chart_labels': json.dumps(chart_labels),
         'chart_data': json.dumps(chart_data),
     }
     return render(request, 'hospitals/index.html', context)
 
-# --- 2. THE MISSING VIEWSETS (The ones causing the error) ---
+# --- 2. API VIEWSETS (Needed for your URLs) ---
 
 class HospitalViewSet(viewsets.ModelViewSet):
     queryset = Hospital.objects.all()
@@ -70,12 +79,14 @@ class RecommendationView(generics.ListAPIView):
         if not issue_query:
             return Hospital.objects.none()
 
+        # Filters by combining occupancy across both patient sources
         queryset = Hospital.objects.annotate(
-            active_patients=Count('admitted_patients', filter=Q(admitted_patients__status='IN'))
+            active_h = Count('hospitals_patients', filter=Q(hospitals_patients__status='IN')),
+            active_p = Count('patients_app_records', filter=Q(patients_app_records__status='IN'))
         ).filter(
             specialties__name__icontains=issue_query,
-            active_patients__lt=models.F('total_capacity')
-        ).order_by('active_patients')
+            active_h__lt=F('total_capacity') # Simplified check
+        ).order_by('active_h')
 
         return queryset[:3]
 
@@ -83,4 +94,5 @@ def delete_hospital(request, pk):
     hospital = get_object_or_404(Hospital, pk=pk)
     if request.method == 'POST':
         hospital.delete()
+        messages.success(request, "Hospital deleted successfully.")
     return redirect('dashboard')

@@ -81,7 +81,7 @@
             </div>
             
             <div class="table-container">
-                <h6 class="fw-bold mb-3"><i class="bi bi-calendar-check me-2"></i>Upcoming</h6>
+                <h6 class="fw-bold mb-3"><i class="bi bi-calendar-check me-2"></i>Upcoming Appts</h6>
                 <div class="list-group list-group-flush small">
                     {% for appt in upcoming_appointments %}
                     <div class="list-group-item bg-transparent border-0 px-0 py-2">
@@ -105,14 +105,14 @@
         <div class="col-md-8">
             <div class="table-container mb-4">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-                    <h4 class="fw-bold text-dark mb-0">Live Hospital Registry</h4>
+                    <h4 class="fw-bold text-dark mb-0">Unified Patient Registry</h4>
                     <div class="d-flex gap-2">
                         <a href="/admin/hospitals/hospital/add/" class="btn btn-success shadow-sm rounded-pill px-3">
                             <i class="bi bi-plus-lg"></i> Add Hospital
                         </a>
                         <form class="d-flex" method="GET">
                             <input class="form-control rounded-pill border-0 shadow-sm px-3" type="search" name="search" 
-                                   value="{{ request.GET.search }}" placeholder="Quick search...">
+                                   value="{{ request.GET.search }}" placeholder="Search patients/hospitals...">
                         </form>
                     </div>
                 </div>
@@ -120,42 +120,62 @@
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr class="text-muted small text-uppercase">
-                            <th>Hospital</th>
-                            <th>Location</th>
+                            <th>Patient / Issue</th>
+                            <th>Assigned Hospital</th>
                             <th>Status</th>
-                            <th class="text-end">Actions</th>
+                            <th class="text-end">Record Type</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for hospital in hospitals %}
+                        {% for patient in combined_patients %}
                         <tr>
                             <td>
-                                <div class="fw-bold text-primary">{{ hospital.name }}</div>
-                                <div class="small text-muted">ID: #00{{ hospital.id }}</div>
+                                <div class="fw-bold text-primary">{{ patient.name }}</div>
+                                <div class="small text-muted">
+                                    {% if patient.health_issue %}
+                                        {{ patient.health_issue }} (Age: {{ patient.age|default:"N/A" }})
+                                    {% else %}
+                                        General Inpatient
+                                    {% endif %}
+                                </div>
                             </td>
-                            <td>{{ hospital.address }}</td>
                             <td>
-                                {% if hospital.total_capacity > 100 %}
-                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success">High Capacity</span>
-                                {% elif hospital.total_capacity > 50 %}
-                                    <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning">Limited</span>
+                                {% if patient.hospital %}
+                                    <i class="bi bi-building me-1"></i> {{ patient.hospital.name }}
+                                {% elif patient.assigned_hospital %}
+                                    <i class="bi bi-building me-1"></i> {{ patient.assigned_hospital.name }}
                                 {% else %}
-                                    <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger">Critical</span>
+                                    <span class="text-muted italic">Waiting for Bed</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if patient.status == 'IN' or patient.status == 'PENDING' %}
+                                    <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning">{{ patient.get_status_display }}</span>
+                                {% elif patient.status == 'OUT' %}
+                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success">{{ patient.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-secondary-subtle text-secondary">{{ patient.status }}</span>
                                 {% endif %}
                             </td>
                             <td class="text-end">
-                                <div class="btn-group shadow-sm rounded-3">
-                                    <a href="/admin/hospitals/hospital/{{ hospital.id }}/change/" class="btn btn-sm btn-light border">Edit</a>
-                                    <form action="{% url 'delete_hospital' hospital.pk %}" method="POST" class="d-inline">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-light border text-danger" onclick="return confirm('Delete permanently?')">Delete</button>
-                                    </form>
-                                </div>
+                                {% if patient.health_issue %}
+                                    <span class="badge bg-info-subtle text-info small">Patients App</span>
+                                {% else %}
+                                    <span class="badge bg-dark-subtle text-dark small">Hospitals App</span>
+                                {% endif %}
                             </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">No patient records found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            
+            <div class="text-end">
+                <a href="/admin/hospitals/hospital/" class="btn btn-sm btn-outline-primary rounded-pill">Manage Hospitals in Admin &raquo;</a>
             </div>
         </div>
     </div>
